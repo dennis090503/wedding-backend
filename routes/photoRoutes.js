@@ -50,20 +50,20 @@ router.get("/", async (req, res) => {
   }
 });
 // GET /photos?page=1&limit=20
-router.get('/photos', async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
+// router.get('/photos', async (req, res) => {
+//   try {
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = parseInt(req.query.limit) || 20;
+//     const skip = (page - 1) * limit;
 
-    const photos = await Photo.find().skip(skip).limit(limit); // Photo is your model
-    const total = await Photo.countDocuments();
+//     const photos = await Photo.find().skip(skip).limit(limit); // Photo is your model
+//     const total = await Photo.countDocuments();
 
-    res.json({ photos, total });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+//     res.json({ photos, total });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 // Get photo counts for all categories
 // CHANGE THIS:
 // app.get("/photo-counts", ...
