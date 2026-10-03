@@ -12,15 +12,26 @@ cloudinary.config({
   api_secret: process.env.API_SECRET,
 });
 
-
 const getEvent = (num) => {
-  if (num >= 1 && num <= 94) return "Katha";
-  if (num >= 95 && num <= 356) return "Baherana";
+  if (num >= 1082 && num <= 1164) return "Reception";
+  if (num >= 1 && num <= 41) return "Katha";        
+  if (num >= 42 && num <= 356) return "Baherana";   
   if (num >= 357 && num <= 412) return "Dikh";
   if (num >= 413 && num <= 2207) return "Hast Melap";
-  if (num >= 2208 && num <= 2667) return "Reception";
+  if (num >= 2208 && num <= 3000) return "Reception"; 
+  
   return "Other";
 };
+// --- Helper for Batching ---
+async function asyncBatch(taskFunctions, batchSize) {
+  const results = [];
+  for (let i = 0; i < taskFunctions.length; i += batchSize) {
+    const batch = taskFunctions.slice(i, i + batchSize);
+    console.log(`Processing batch: ${i / batchSize + 1}...`);
+    results.push(...(await Promise.all(batch.map((task) => task()))));
+  }
+  return results;
+}
 
 const uploadImages = async () => {
   const folderPath = path.join(__dirname, "images");
@@ -31,57 +42,46 @@ const uploadImages = async () => {
     return numA - numB;
   });
 
- for (let file of files) {
-  const filePath = path.join(folderPath, file);
+  const uploadTasks = files.map((file) => async () => {
+    const filePath = path.join(folderPath, file);
+    const match = file.match(/image_(\d+)/i);
+    const imageNumber = match ? parseInt(match[1]) : null;
 
-  const match = file.match(/image_(\d+)/i);
-  const imageNumber = match ? parseInt(match[1]) : null;
+    if (!imageNumber) return;
 
-  if (!imageNumber) {
-    console.log(`Skipping: ${file}`);
-    continue;
-  }
+    const event = getEvent(imageNumber);
 
-  // 🔥 Skip already uploaded images
-  if (imageNumber <= 2267) {
-    console.log(`Already uploaded, skipping: ${file}`);
-    continue;
-  }
-  //  if (!imageNumber) {
-  //     console.log(`Skipping: ${file}`);
-  //     continue;
-  //   }
+    try {
+      const result = await cloudinary.uploader.upload(filePath, {
+        folder: `wedding_gallery/${event}`,
+        use_filename: true,
+        unique_filename: false,
+      });
 
-  const event = getEvent(imageNumber);
+      await Photo.create({
+        url: result.secure_url,
+        public_id: result.public_id,
+        event,
+        imageNumber: Number(imageNumber),
+      });
 
-  try {
-    const result = await cloudinary.uploader.upload(filePath, {
-      folder: `gallery/${event}`, // better structure
-    });
+      console.log(`✅ Uploaded [${imageNumber}]`);
+    } catch (err) {
+      console.error(`❌ FAILED: ${file}`, err.message);
+    }
+  });
 
-    await Photo.create({
-      url: result.secure_url,
-      public_id: result.public_id,
-      event,
-      imageNumber,
-    });
-
-    console.log(`Uploaded: ${file} → ${event}`);
-  } catch (err) {
-    console.log(`Error uploading ${file}`, err);
-  }
-}
-
-  console.log("All images uploaded!");
-  process.exit();
+  // Upload 15 images at a time
+  await asyncBatch(uploadTasks, 15);
+  console.log("--- ALL IMAGES UPLOADED ---");
 };
-console.log("Connecting to:", process.env.MONGODB_URI.split('@')[1]);
+
 mongoose.connect(process.env.MONGODB_URI)
-  .then(async () => { // Make this async
-    console.log("MongoDB Connected");
-    await uploadImages(); // Wait for it to finish
-    console.log("Done! Closing connection...");
-    process.exit(0); // Exit safely after everything is done
+  .then(async () => {
+    console.log("Connected to MongoDB. Wiping existing data...");
+    await Photo.deleteMany({}); 
+    await uploadImages();
+    process.exit(0);
   })
   .catch(err => {
     console.error("Connection error:", err);
