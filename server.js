@@ -19,9 +19,25 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB Connected"))
   .catch(err => console.log("MongoDB Connection Error:", err));
 
+// --- Health / Root endpoints (no DB, responds instantly) ---
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "Wedding Gallery API",
+    health: "/health",
+  });
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
 const photoRoutes = require("./routes/photoRoutes");
 const authRoutes = require("./routes/authRoutes");
 app.use("/photos", photoRoutes);
 app.use("/auth", authRoutes);
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log("Server running on port 5000"));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
